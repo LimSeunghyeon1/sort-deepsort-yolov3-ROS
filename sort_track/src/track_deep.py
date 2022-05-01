@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 ROS node to track objects using DEEP_SORT TRACKER and YOLOv3 detector (darknet_ros)
@@ -8,7 +8,7 @@ For this reason there is a little delay in the publishing of the image that I st
 """
 import rospy
 import numpy as np
-from darknet_ros_msgs.msg import BoundingBoxes
+from yolov3_pytorch_ros.msg import BoundingBoxes
 from deep_sort.detection import Detection
 from deep_sort import nn_matching
 from deep_sort.tracker import Tracker
@@ -25,12 +25,13 @@ def get_parameters():
 	Gets the necessary parameters from .yaml file
 	Returns tuple
 	"""
-	camera_topic = rospy.get_param("~camera_topic")
-	detection_topic = rospy.get_param("~detection_topic")
-	tracker_topic = rospy.get_param('~tracker_topic')
-	return (camera_topic, detection_topic, tracker_topic)
-
-
+	camera_topic = rospy.get_param("/sort_track/camera_topic")
+	detection_topic = rospy.get_param("/sort_track/detection_topic")
+	tracker_topic = rospy.get_param('/sort_track/tracker_topic')
+	model_dir = rospy.get_param('/sort_track/model_dir')
+	return (camera_topic, detection_topic, tracker_topic, model_dir)
+detections=[]
+scores=[]
 def callback_det(data):
 	global detections
 	global scores
@@ -44,8 +45,10 @@ def callback_det(data):
 
 def callback_image(data):
 	#Display Image
+	global detections
+	global scores
 	bridge = CvBridge()
-	cv_rgb = bridge.imgmsg_to_cv2(data, "bgr8")
+	cv_rgb = bridge.imgmsg_to_cv2(data, "rgb8")
 	#Features and detections
 	features = encoder(cv_rgb, detections)
 	detections_new = [Detection(bbox, score, feature) for bbox,score, feature in
@@ -55,22 +58,21 @@ def callback_image(data):
 	scores_new = np.array([d.confidence for d in detections_new])
 	indices = prep.non_max_suppression(boxes, 1.0 , scores_new)
 	detections_new = [detections_new[i] for i in indices]
-        # Call the tracker
-        tracker.predict()
-        tracker.update(detections_new)
+	tracker.predict()
+	tracker.update(detections_new)
 	#Detecting bounding boxes
 	for det in detections_new:
 		bbox = det.to_tlbr()
-		cv2.rectangle(cv_rgb,(int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),(100,255,50), 1)
-		cv2.putText(cv_rgb , "person", (int(bbox[0]), int(bbox[1])), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100,255,50), lineType=cv2.LINE_AA)
-	#Tracker bounding boxes
-        for track in tracker.tracks:
-		if not track.is_confirmed() or track.time_since_update > 1:
-                	continue
-        	bbox = track.to_tlbr()
-		msg.data = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]), track.track_id]
-        	cv2.rectangle(cv_rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),(255,255,255), 1)
-            	cv2.putText(cv_rgb, str(track.track_id),(int(bbox[2]), int(bbox[1])),0, 5e-3 * 200, (255,255,255),1)
+		cv2.rectangle(cv_rgb,(int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),(100,255,50),3, 1)
+		cv2.putText(cv_rgb , "person", (int(bbox[0]), int(bbox[1])), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100,255,50),3, lineType=cv2.LINE_AA)
+		for track in tracker.tracks:
+			if not track.is_confirmed() or track.time_since_update > 1:
+				continue
+			bbox = track.to_tlbr()
+			msg.data = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]), track.track_id]
+			cv2.rectangle(cv_rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),(0,0,255),3, 1)
+			cv2.putText(cv_rgb, str(track.track_id),(int(bbox[2]), int(bbox[1])),0, 5e-3 * 200, (0,0,255),3,1)
+	
 	cv2.imshow("YOLO+SORT", cv_rgb)
 	cv2.waitKey(3)
 		
@@ -84,13 +86,14 @@ def main():
 	nn_budget = 100
 	metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
 	tracker = Tracker(metric)
-	model_filename = "/home/ilyas/darknetros_sort/src/sort_track/src/deep_sort/model_data/mars-small128.pb" #Change it to your directory
+	(camera_topic, detection_topic, tracker_topic, model_dir) = get_parameters()
+	model_filename = model_dir #Change it to your directory
 	encoder = gdet.create_box_encoder(model_filename)
 	#Initialize ROS node
 	rospy.init_node('sort_tracker', anonymous=True)
 	rate = rospy.Rate(10)
 	# Get the parameters
-	(camera_topic, detection_topic, tracker_topic) = get_parameters()
+	
 	#Subscribe to image topic
 	image_sub = rospy.Subscriber(camera_topic,Image,callback_image)
 	#Subscribe to darknet_ros to get BoundingBoxes from YOLOv3
