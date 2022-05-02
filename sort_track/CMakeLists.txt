@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   cv_bridge
   message_generation
+  yolov3_pytorch_ros
 )
 
 ## System dependencies are found with CMake's conventions
@@ -53,6 +54,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   IntList.msg
+  BoundingBoxesDepth.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -74,6 +76,7 @@ generate_messages(
   DEPENDENCIES
   std_msgs
   sort_track
+  yolov3_pytorch_ros
 )
 
 ################################################
@@ -113,6 +116,7 @@ catkin_package(
     rospy
     std_msgs
     sensor_msgs
+    yolov3_pytorch_ros
     cv_bridge
     message_runtime
 

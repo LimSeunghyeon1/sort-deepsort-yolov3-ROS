@@ -38,7 +38,7 @@ def callback_det(data):
 	detections = []
 	scores = []
 	for box in data.bounding_boxes:
-		detections.append(np.array([box.xmin, box.ymin, box.xmax-box.xmin, box.ymax-box.ymin]))
+		detections.append(np.array([box.xmin, box.ymin, box.xmax-box.xmin, box.ymax-box.ymin,box.depth]))
 		scores.append(float('%.2f' % box.probability))
 	detections = np.array(detections)
 
@@ -69,7 +69,7 @@ def callback_image(data):
 			if not track.is_confirmed() or track.time_since_update > 1:
 				continue
 			bbox = track.to_tlbr()
-			msg.data = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]), track.track_id]
+			msg.data = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]),float(bbox[4]) track.track_id]
 			cv2.rectangle(cv_rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),(0,0,255),3, 1)
 			cv2.putText(cv_rgb, str(track.track_id),(int(bbox[2]), int(bbox[1])),0, 5e-3 * 200, (0,0,255),3,1)
 	
