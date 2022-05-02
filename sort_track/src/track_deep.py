@@ -38,7 +38,7 @@ def callback_det(data):
 	detections = []
 	scores = []
 	for box in data.bounding_boxes:
-		detections.append(np.array([box.xmin, box.ymin, box.xmax-box.xmin, box.ymax-box.ymin,box.depth]))
+		detections.append(np.array([int(box.xmin), int(box.ymin), int(box.xmax-box.xmin), int(box.ymax-box.ymin),box.depth]))
 		scores.append(float('%.2f' % box.probability))
 	detections = np.array(detections)
 
@@ -50,18 +50,25 @@ def callback_image(data):
 	bridge = CvBridge()
 	cv_rgb = bridge.imgmsg_to_cv2(data, "rgb8")
 	#Features and detections
-	features = encoder(cv_rgb, detections)
+	print ("dectection",detections)
+	detection_temp = np.zeros(shape = (len(detections),4))
+	depth_detection = np.zeros(shape = len(detections))
+	for i in range(len(detections)):
+		detection_temp[i] = detections[i][0:4]
+		depth_detection[i] = detections[i][4]
+	features = encoder(cv_rgb, detection_temp)
 	detections_new = [Detection(bbox, score, feature) for bbox,score, feature in
-                        zip(detections,scores, features)]
+                        zip(detection_temp , scores, features)]
 	# Run non-maxima suppression.
 	boxes = np.array([d.tlwh for d in detections_new])
+	print("boxes",boxes)
 	scores_new = np.array([d.confidence for d in detections_new])
 	indices = prep.non_max_suppression(boxes, 1.0 , scores_new)
 	detections_new = [detections_new[i] for i in indices]
 	tracker.predict()
 	tracker.update(detections_new)
 	#Detecting bounding boxes
-	for det in detections_new:
+	for idx,det in enumerate(detections_new):
 		bbox = det.to_tlbr()
 		cv2.rectangle(cv_rgb,(int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),(100,255,50),3, 1)
 		cv2.putText(cv_rgb , "person", (int(bbox[0]), int(bbox[1])), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100,255,50),3, lineType=cv2.LINE_AA)
@@ -69,7 +76,7 @@ def callback_image(data):
 			if not track.is_confirmed() or track.time_since_update > 1:
 				continue
 			bbox = track.to_tlbr()
-			msg.data = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]),float(bbox[4]) track.track_id]
+			msg.data = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]), depth_detection[idx], track.track_id]
 			cv2.rectangle(cv_rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),(0,0,255),3, 1)
 			cv2.putText(cv_rgb, str(track.track_id),(int(bbox[2]), int(bbox[1])),0, 5e-3 * 200, (0,0,255),3,1)
 	
