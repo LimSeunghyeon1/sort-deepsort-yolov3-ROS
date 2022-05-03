@@ -19,7 +19,8 @@ import cv2
 from sensor_msgs.msg import Image
 from sort_track.msg import IntList
 
-
+br = CvBridge()
+pub_image = rospy.Publisher('sort_vis',Image,queue_size=10)
 def get_parameters():
 	"""
 	Gets the necessary parameters from .yaml file
@@ -80,6 +81,7 @@ def callback_image(data):
 			cv2.rectangle(cv_rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),(0,0,255),3, 1)
 			cv2.putText(cv_rgb, str(track.track_id),(int(bbox[2]), int(bbox[1])),0, 5e-3 * 200, (0,0,255),3,1)
 	
+	pub_image.publish(br.cv2_to_imgmsg(cv_rgb))
 	cv2.imshow("YOLO+SORT", cv_rgb)
 	cv2.waitKey(3)
 		
