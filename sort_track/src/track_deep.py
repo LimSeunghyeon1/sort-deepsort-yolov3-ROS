@@ -21,6 +21,7 @@ from sort_track.msg import IntList
 
 br = CvBridge()
 pub_image = rospy.Publisher('sort_vis',Image,queue_size=10)
+pub_trackers = rospy.Publisher('/sort_track_deep', IntList, queue_size=10)
 def get_parameters():
 	"""
 	Gets the necessary parameters from .yaml file
@@ -51,7 +52,7 @@ def callback_image(data):
 	bridge = CvBridge()
 	cv_rgb = bridge.imgmsg_to_cv2(data, "rgb8")
 	#Features and detections
-	print ("dectection",detections)
+	#print ("dectection",detections)
 	detection_temp = np.zeros(shape = (len(detections),4))
 	depth_detection = np.zeros(shape = len(detections))
 	for i in range(len(detections)):
@@ -60,6 +61,14 @@ def callback_image(data):
 	features = encoder(cv_rgb, detection_temp)
 	detections_new = [Detection(bbox, score, feature) for bbox,score, feature in
                         zip(detection_temp , scores, features)]
+	_temp = []
+	for i,detection in enumerate(detections_new):
+		if detection.confidence > 0.5:
+			print("confidence",detection.confidence)
+			_temp.append(detection)
+		else:
+			print("omg")
+	detections_new = _temp
 	# Run non-maxima suppression.
 	boxes = np.array([d.tlwh for d in detections_new])
 	print("boxes",boxes)
@@ -78,6 +87,8 @@ def callback_image(data):
 				continue
 			bbox = track.to_tlbr()
 			msg.data = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]), depth_detection[idx], track.track_id]
+			print("msg data",msg.data)
+			pub_trackers.publish(msg)
 			cv2.rectangle(cv_rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),(0,0,255),3, 1)
 			cv2.putText(cv_rgb, str(track.track_id),(int(bbox[2]), int(bbox[1])),0, 5e-3 * 200, (0,0,255),3,1)
 	
@@ -109,9 +120,9 @@ def main():
 	sub_detection = rospy.Subscriber(detection_topic, BoundingBoxes , callback_det)
 	while not rospy.is_shutdown():
 		#Publish results of object tracking
-		pub_trackers = rospy.Publisher(tracker_topic, IntList, queue_size=10)
+		#pub_trackers = rospy.Publisher(tracker_topic, IntList, queue_size=10)
 		print(msg)
-		pub_trackers.publish(msg)
+		#pub_trackers.publish(msg)
 		rate.sleep()
 
 
